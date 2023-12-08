@@ -9,17 +9,20 @@ WORK_PATH = "./"
 
 J5_IP = "192.168.1.10"
 
-KEY_KARAOKE_APP = "Karaoke"
-KILL_KARAOKE_NAME = "com.changba.sd"
+# KEY_KARAOKE_APP = "Karaoke"
+# KILL_KARAOKE_NAME = "com.changba.sd"
 
-# KEY_KARAOKE_APP = "changba"
-# KILL_KARAOKE_NAME = "com.tencent.wecar.karaoke"
+KEY_KARAOKE_APP = "changba"
+KILL_KARAOKE_NAME = "com.tencent.wecar.karaoke"
 
 BSP_VERSION = "Halo5-BSP-1.0.12_Release"
 BSP_VERSION_PATH = "/etc/version"
 
 AIMATE_SPEECH_VERSION = "J5-HALO-GUA-AIMATE-RR1-Develop-0.3.0-rc1"
 AIMATE_SPEECH_VERSION_PATH = "/userdata/app/halo/etc/version"
+
+USER_CONF_PATH = "/userdata/faceid/"
+USER_CONF_NAME = "user_config.json"
 
 VERSION_DICT = dict()
 
@@ -198,6 +201,25 @@ def modify_conf():
 
     print("now modify hiok ref channel done")
 
+    transfer_file_from_j5(USER_CONF_PATH + USER_CONF_NAME, "./")
+    if not os.path.exists(USER_CONF_NAME):
+        speech_work_status = {"speech_work_status" : 1}
+        with open(USER_CONF_NAME, "w", newline='\n') as f:
+            json.dump(speech_work_status, f, indent=4)
+    else:
+        with open(USER_CONF_NAME, 'r') as f:
+            user_conf = json.load(f)
+
+        user_conf["speech_work_status"] = 1
+
+        with open(USER_CONF_NAME, 'w', newline='\n') as f:
+            json.dump(user_conf, f, indent=4)
+
+    transfer_file_to_j5(USER_CONF_NAME, USER_CONF_PATH)
+
+    os.remove(USER_CONF_NAME)
+
+    print("now modify J5 conf finish")
 
 def prepare_j5_env():
     print("now prepare j5 env")
