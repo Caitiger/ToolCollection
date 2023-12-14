@@ -7,32 +7,33 @@ import shutil
 
 WORK_PATH = "./"
 
-J5_IP = "192.168.1.10"
+J5_IP = "192.168.1.10"  # J5板子IP地址
 
 # KEY_KARAOKE_APP = "Karaoke"
 # KILL_KARAOKE_NAME = "com.changba.sd"
 
-KEY_KARAOKE_APP = "changba"
-KILL_KARAOKE_NAME = "com.tencent.wecar.karaoke"
+KEY_KARAOKE_APP = "changba"  # K歌软件关键字
+KILL_KARAOKE_NAME = "com.tencent.wecar.karaoke"   # 待关闭的K歌进程
 
-BSP_VERSION = "Halo5-BSP-1.0.12_Release"
-BSP_VERSION_PATH = "/etc/version"
+BSP_VERSION = "Halo5-BSP-1.0.12_Release"   # 系统软件版本号
+BSP_VERSION_PATH = "/etc/version"  # 系统软件版本路径
 
-AIMATE_SPEECH_VERSION = "J5-HALO-GUA-AIMATE-RR1-Develop-0.3.0-rc1"
-AIMATE_SPEECH_VERSION_PATH = "/userdata/app/halo/etc/version"
+AIMATE_SPEECH_VERSION = "J5-HALO-GUA-AIMATE-RR1-Develop-0.3.0-rc1"  # AIMate感知软件版本号
+AIMATE_SPEECH_VERSION_PATH = "/userdata/app/halo/etc/version"  # AIMate感知软件版本路径
 
 USER_CONF_PATH = "/userdata/faceid/"
 USER_CONF_NAME = "user_config.json"
 
 VERSION_DICT = dict()
 
-WATCHDOG_CONF_CONTENT = "AVSPEECH|HIOK SENSOR"
+WATCHDOG_CONF_CONTENT = "AVSPEECH|HIOK SENSOR"  # AIMate感知软件启动方式
 
-KEY_AIMATE_SPEECH = "AIMATE"
-KEY_HIOK_CONF = "hiok"
-KEY_AIMATE_JARIVS = "antares"
-KEY_KARAOKE_KPLUGIN = "kplugin"
-KEY_BSP = "BSP"
+KEY_AIMATE_SPEECH = "AIMATE"  # AIMateSpeech感知软件包关键字
+KEY_HIOK_CONF = "hiok"  # hiok算法配置文件关键字
+KEY_AIMATE_JARIVS = "antares"  # AIMateJarivs软件包关键字
+KEY_AIMATE_JARIVS_APK = "jobs"  # AIMateJarivs APK 关键字
+KEY_KARAOKE_KPLUGIN = "kplugin"  # K歌插件关键字
+KEY_BSP = "BSP"  # 系统软件包关键字
 
 WATCHDOG_CONF_PATH = "/userdata/app/halo/bin/scripts/"
 HIOK_CONF_PATH = "/userdata/app/halo/etc/hiok/algo/hiok/"
@@ -287,7 +288,7 @@ def intall_jarivs():
 
     os.makedirs(KEY_AIMATE_JARIVS)
 
-    jarivs_path = get_zip_file_path(WORK_PATH + VERSION_DICT[KEY_AIMATE_JARIVS], KEY_AIMATE_JARIVS, "jobs")
+    jarivs_path = get_zip_file_path(WORK_PATH + VERSION_DICT[KEY_AIMATE_JARIVS], KEY_AIMATE_JARIVS, KEY_AIMATE_JARIVS_APK)
 
     cmd = f"adb install -r -t {jarivs_path}"  # 首次安装需要在pad上手动授权
     run_shell_cmd(cmd)
@@ -320,9 +321,10 @@ def prepare_android_env():
     run_shell_cmd(cmd)
 
     install_karaoke_app()
-    intall_jarivs()
     if "Karaoke" == KEY_KARAOKE_APP:
         install_kplugin()
+
+    intall_jarivs()
 
     print(">>>>>>>>>>>>>now android env ready<<<<<<<<<<<<<<<<")
 
