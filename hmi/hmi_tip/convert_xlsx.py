@@ -2,10 +2,16 @@ import argparse
 
 import pandas as pd
 from ruamel.yaml import YAML
+from googletrans import Translator
+
+# 持续发送帧率
+CONTINUOUS_PUB_COUNT = 10
 
 SHEET_NAME_DRIVING_TIPS = "行车告警提示"
 SHEET_NAME_FAULT_TIPS = "智驾故障报警及工程类提示"
-SHEET_NAME_DRIVING_PRIORITY = "附：智驾意图提示优先级排序"
+SHEET_NAME_DRIVING_PRIORITY = "附_智驾意图提示优先级排序"
+SHEET_NAME_CENTER_TIPS = "中控屏提示"
+SHEET_NAME_VERSION = "版本"
 
 # 未定义显示策略
 TIPS_DISPLAY_UNDEFINE = 0
@@ -20,7 +26,7 @@ TIPS_DISPLAY_5_SECONDS_DESC = "5s"
 TIPS_DISPLAY_WITH_SIGNAL_DESC = "随信号持续显示"
 TIPS_DISPLAY_WITH_SIGNAL_LEAST_5_SECONDS_DESC = "随信号至少5s"
 
-# 为定义告警消息
+# 未定义告警消息
 TIP_TYPE_UNDEFINE = 0
 # 状态迁移告警消息
 TIP_TYPE_STATE_TRANS = 1
@@ -63,7 +69,7 @@ def parse_sheet(sheet):
             for col in sheet.columns:
                 value = row[col]
                 # if pd.notna(value) and str(value).strip():
-                row_dict[col.replace('\n', '')] = value
+                row_dict[col.split('\n')[0]] = value
             result_list.append(row_dict)
 
     return result_list
@@ -183,6 +189,17 @@ def get_tip_location(tip_type):
 
 
 def generate_yaml_file(xlsx_content, yaml_file):
+    version = xlsx_content[SHEET_NAME_VERSION]
+
+    latest_version = 0.0
+
+    for item in version:
+        if pd.notna(item.get('版本号')):
+            version = float(item.get('版本号'))
+            if version > latest_version:
+                latest_version = version
+
+
     # 合并所有sheet的数据
     merged_list = []
 
@@ -195,6 +212,22 @@ def generate_yaml_file(xlsx_content, yaml_file):
 
     # 创建要写入的格式
     formatted_list = []
+
+    formatted_item_none = {
+        'tip_id': 0,
+        'tip_state': "ON",
+        'tip_type': 0,
+        'tip_priority': 9999,
+        'tip_sub_pri': 0,
+        'tip_display': 0,
+        'tip_desc': "tip_none",
+        'tip_location': [],
+        'tip_extend_1': [],
+        'tip_extend_2': []
+    }
+
+    formatted_list.append(formatted_item_none)
+
     for item in sorted_list:
         if pd.notna(item.get('ID')):
             tip_id = int(item.get('ID'))
@@ -219,6 +252,28 @@ def generate_yaml_file(xlsx_content, yaml_file):
             if display_desc is None:
                 display_desc = item.get('Toast显示策略')
 
+            tip_extend_1 = []
+            if pd.notna(item.get('拓展字段1')) and item.get('拓展字段1') != '/':
+                extend_1_list = item.get('拓展字段1').split('\n')
+                if len(extend_1_list) > 1:
+                    for extend_1 in extend_1_list:
+                        tip_extend_1.append(extend_1.split(':')[-1])
+                else:
+                    tip_extend_1 = extend_1_list
+
+            tip_extend_2 = []
+            if pd.notna(item.get('拓展字段2')) and item.get('拓展字段2') != '/':
+                extend_2_list = item.get('拓展字段2').split('\n')
+                if len(extend_2_list) > 1:
+                    for extend_2 in extend_2_list:
+                        tip_extend_2.append(extend_2.split(':')[-1])
+                else:
+                    tip_extend_2 = extend_2_list
+
+            tip_desc = ""
+            if pd.notna(item.get('场景')):
+                tip_desc = item.get('场景').split('\n')[0].strip().replace(' ', '')
+
             formatted_item = {
                 'tip_id': tip_id,
                 'tip_state': "ON",
@@ -226,13 +281,18 @@ def generate_yaml_file(xlsx_content, yaml_file):
                 'tip_priority': tip_priority,
                 'tip_sub_pri': tip_sub_pri,
                 'tip_display': get_tip_display(display_desc),
-                'tip_desc': item.get('场景').split('\n')[0],
-                'tip_location': get_tip_location(tip_type)
+                'tip_desc': tip_desc,
+                'tip_location': get_tip_location(tip_type),
+                'tip_extend_1': tip_extend_1,
+                'tip_extend_2': tip_extend_2
             }
             formatted_list.append(formatted_item)
 
     # 写入yaml文件
-    output_data = {'driving_tips': formatted_list}
+    output_data = {
+        'version': latest_version,
+        'continuous_pub_count': CONTINUOUS_PUB_COUNT,
+        'hmi_tips': formatted_list}
     yaml = YAML()
     yaml.indent(mapping=2, sequence=4, offset=2)
     yaml.width = 1  # 强制每个键值对单独成行
@@ -241,16 +301,50 @@ def generate_yaml_file(xlsx_content, yaml_file):
         yaml.dump(output_data, f)
 
 
+def generate_msg_prefix(xlsx_content, msg_prefix_file):
+    msg_list = xlsx_content[SHEET_NAME_DRIVING_TIPS]
+
+    # 按id值升序排序
+    sorted_list = sorted(msg_list, key=lambda x: float(x[get_id_key(x)]))
+
+    translator = Translator()
+
+    msg_prefix_list = []
+    for item in sorted_list:
+        if pd.notna(item.get('ID')):
+            msg_item = []
+            tip_id = int(item.get('ID'))
+            msg_item.append(tip_id)
+
+            tip_desc = item.get('场景').split('\n')[0]
+            translated_tip_desc = translator.translate(tip_desc, dest='en').text.upper().replace(' ', '_')
+
+            print(translated_tip_desc)
+            msg_item.append(translated_tip_desc)
+            msg_item.append(tip_desc)
+
+            msg_prefix_list.append(msg_item)
+
+    # 写入文件
+    with open(msg_prefix_file, 'w', encoding='utf-8') as f:
+        for msg_prefix in msg_prefix_list:
+            f.write(f"# {msg_prefix[2]}\n")
+            f.write(f"int32 TIP_ID_{msg_prefix[1]} = {msg_prefix[0]}\n")
+
 
 def convert_xlsx(input_file, output_path):
-    sheet_names = [SHEET_NAME_DRIVING_TIPS,
-                   SHEET_NAME_FAULT_TIPS, SHEET_NAME_DRIVING_PRIORITY]
+    sheet_names = [SHEET_NAME_VERSION,
+                   SHEET_NAME_DRIVING_TIPS,
+                #    SHEET_NAME_FAULT_TIPS,
+                   SHEET_NAME_DRIVING_PRIORITY]
 
     xlsx_content = parse_xlsx(input_file, sheet_names)
 
-    yaml_file = output_path + "/driving_tips.yaml"
-
+    yaml_file = output_path + "/driving_tips_no_tip_name.yaml"
     generate_yaml_file(xlsx_content, yaml_file)
+
+    # msg_prefix_file = output_path + "/msg_prefix.msg"
+    # generate_msg_prefix(xlsx_content, msg_prefix_file)
 
 
 if __name__ == '__main__':
